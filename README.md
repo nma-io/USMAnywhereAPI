@@ -17,8 +17,5 @@ Then go here:
 
 https://www.alienvault.com/documentation/api/usm-anywhere-api.htm
 
-The Go code is really dirty. It works, but its ugly and I could use someone with more experience in JSON handling with Go to help me clean it up. 
-
-Please submit pull requests.
 
 

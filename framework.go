@@ -2,29 +2,27 @@ package main
 
 /*
 Quick Alienvault USM Anywhere client for Go.
-This was VERY hackish; I need to figure out a better solution
-for JSON problems, this re-defining interfaces is ugly and
-confusing. Recommending the python code for simplicity,
-but I'm leaving this here and soliciting pull requests to show
-me how to handle the json better.
+
+Requires gjson for json parsing:
+	go get github.com/tidwall/gjson
 
 NMA 2018.
 */
 import (
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/tidwall/gjson"
 )
 
 var URL string = "alienvault.cloud/api/2.0"
 var HOST string = "yoursubdomain"
 
 func Auth(apiUser, apiKey string) (token string) {
-	var json_data map[string]interface{}
 	client := &http.Client{}
 	v := url.Values{}
 	apilink := fmt.Sprintf("https://" + HOST + "." + URL + "/oauth/token?grant_type=client_credentials")
@@ -39,21 +37,20 @@ func Auth(apiUser, apiKey string) (token string) {
 		return
 	}
 	defer resp.Body.Close()
-	z, _ := ioutil.ReadAll(resp.Body)
+	json, _ := ioutil.ReadAll(resp.Body)
 
-	if strings.Contains(string(z), "Unauthorized") {
-		log.Fatal(string(z)) // Bad API Key
+	if strings.Contains(string(json), "Unauthorized") {
+		log.Fatal(string(json)) // Bad API Key
 		return
 	}
-	json.Unmarshal([]byte(z), &json_data)
-	if len(json_data["access_token"].(string)) > 0 {
-		token = json_data["access_token"].(string)
+	token = gjson.Get(string(json), "access_token").String()
+	if len(token) < 128 {
+		log.Fatal("No Token Received.") // We shouldn't get here.
 	}
 	return
 }
 
-func Alarms(accessToken string) []byte {
-	var json_data map[string]interface{}
+func Alarms(accessToken string) string {
 	client := &http.Client{}
 	v := url.Values{}
 	apilink := fmt.Sprintf("https://" + HOST + "." + URL + "/alarms/?page=1&size=20&suppressed=false&status=open")
@@ -65,31 +62,23 @@ func Alarms(accessToken string) []byte {
 		log.Fatal(err)
 	}
 	defer resp.Body.Close()
-	z, _ := ioutil.ReadAll(resp.Body)
-	json.Unmarshal(z, &json_data)
-	alarms := json_data["_embedded"].(map[string]interface{})
-	jsonOutput, _ := json.Marshal(alarms)
+	json, _ := ioutil.ReadAll(resp.Body)
+	jsonOutput := gjson.Get(string(json), "_embedded.alarms").String()
+
 	return jsonOutput
 }
 
 func Events() {
-	// Not implemented
+	// Not implemented ... But here is where you can get more data.
 }
 
 func main() {
 	key := Auth("apiclientname", "secret")
-	var jdata map[string]interface{}
 	x := Alarms(key)
-	err := json.Unmarshal(x, &jdata)
-	if err != nil {
-		log.Fatal(err)
-	}
-	for _, k := range jdata["alarms"].([]interface{}) {
-		rule := k.(map[string]interface{})["rule_method"]
-		src := k.(map[string]interface{})["alarm_sources"]
-
-		fmt.Println(rule, src)
-
+	rule := gjson.Get(x, "#.rule_method")
+	src := gjson.Get(x, "#.alarm_sources")
+	for i := range rule.Array() {
+		fmt.Println(rule.Array()[i], src.Array()[i])
 	}
 
 }
