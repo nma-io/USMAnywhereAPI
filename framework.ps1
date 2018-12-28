@@ -16,7 +16,7 @@ function Authenticate {
 
 
 function Alarms {
-    $alarmreq="https://" + $domain + "." + $url + "/alarms/?page=1&size=20&suppressed=false&status=open"
+    $alarmreq="https://" + $domain + "." + $url + "/alarms/?suppressed=false&status=open&timestamp_occured_gte=1538762000"
     Invoke-WebRequest $alarmreq -Headers @{"Authorization"="Bearer " + $args[0]} -Method GET | ConvertFrom-Json | ForEach-Object _embedded | ForEach-Object alarms | Select-Object rule_method, alarm_sources
 }
 
